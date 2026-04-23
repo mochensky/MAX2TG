@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mochensky/max2tg-go/src"
+	"github.com/mochensky/max2tg/src"
 )
 
 func BuildOutput(message src.Message, senderName string, userNames map[string]string, deletionTime *int64) string {
@@ -592,6 +593,8 @@ func SyncChatHistory(client *src.Client, db *src.Database, sender *src.TelegramS
 }
 
 func main() {
+	timeFormat := "02.01.2006 15:04:05"
+
 	configPath := "data/config.yml"
 	if len(os.Args) > 1 {
 		configPath = os.Args[1]
@@ -599,17 +602,29 @@ func main() {
 
 	cfg, err := src.LoadConfig(configPath)
 	if err != nil {
-		fmt.Printf("[%s] Failed to load config: %v\n", time.Now().Format("02.01.2006 15:04:05"), err)
+		fmt.Printf("[%s] Failed to load config: %v\n", time.Now().Format(timeFormat), err)
 		os.Exit(1)
 	}
 
 	if err := src.SetupLogger(cfg.LogPath); err != nil {
-		fmt.Printf("[%s] Failed to setup logger: %v\n", time.Now().Format("02.01.2006 15:04:05"), err)
+		fmt.Printf("[%s] Failed to setup logger: %v\n", time.Now().Format(timeFormat), err)
 		os.Exit(1)
 	}
 	defer src.CloseLogger()
 
-	src.Logf("Starting max2tg...")
+	src.Logf("Starting %s...", src.GetVersionInfo())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	latestVersion, updateAvailable, err := src.CheckForUpdates(ctx)
+	cancel()
+
+	if err != nil {
+		src.Logf("Failed to check for updates: %v", err)
+	} else if updateAvailable {
+		src.Logf("New version available: %s (current: %s). Download: https://github.com/mochensky/max2tg/releases/latest", latestVersion, src.AppVersion)
+	} else {
+		src.Logf("Application is up to date (%s)", src.AppVersion)
+	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)

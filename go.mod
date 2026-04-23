@@ -1,4 +1,4 @@
-module github.com/mochensky/max2tg-go
+module github.com/mochensky/max2tg
 
 go 1.25.0
 

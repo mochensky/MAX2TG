@@ -11,6 +11,8 @@ import (
 )
 
 const (
+	AppName             = "max2tg"
+	AppVersion          = "1.0.2"
 	DefaultLogPath      = "data/logs"
 	DefaultDBPath       = "data/database.db"
 	DefaultDownloadPath = "data/downloads"
@@ -25,7 +27,7 @@ var DefaultConfig = &Config{
 		DeviceLocale: "ru",
 		OSVersion:    "Windows",
 		DeviceName:   "Firefox",
-		AppVersion:   "26.4.3",
+		AppVersion:   "26.4.7",
 		Screen:       "1920x1080 1.0x",
 		Timezone:     "Europe/Moscow",
 	},
@@ -197,7 +199,10 @@ func CreateDefaultConfig(path string) error {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	yamlContent := fmt.Sprintf(`log_path: "%s"
+	yamlContent := fmt.Sprintf(`# %s %s
+# GitHub: https://github.com/mochensky/max2tg
+
+log_path: "%s"
 db_path: "%s"
 download_path: "%s"
 
@@ -266,10 +271,10 @@ user_agent:
   device_locale: "ru"
   os_version: "Windows"
   device_name: "YandexBrowser"
-  app_version: "26.4.3"
+  app_version: "26.4.7"
   screen: "1920x1080 1.0x"
   timezone: "Europe/Moscow"
-`, DefaultLogPath, DefaultDBPath, DefaultDownloadPath)
+`, AppName, AppVersion, DefaultLogPath, DefaultDBPath, DefaultDownloadPath)
 
 	return os.WriteFile(path, []byte(yamlContent), 0644)
 }
