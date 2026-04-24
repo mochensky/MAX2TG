@@ -12,7 +12,7 @@ import (
 
 const (
 	AppName             = "max2tg"
-	AppVersion          = "1.0.3"
+	AppVersion          = "1.0.4"
 	DefaultLogPath      = "data/logs"
 	DefaultDBPath       = "data/database.db"
 	DefaultDownloadPath = "data/downloads"
@@ -64,6 +64,7 @@ Accept-Encoding: identity
 Priority: u=4
 Pragma: no-cache
 Cache-Control: no-cache`,
+	SyncHistoryDepth:     30,
 	SaveDeleted:          true,
 	TruncateLongMessages: true,
 
@@ -206,6 +207,9 @@ func CreateDefaultConfig(path string) error {
 log_path: "%s"
 db_path: "%s"
 download_path: "%s"
+
+# how many recent chat messages will be checked for chat sync?
+sync_history_depth: 30
 
 # will deleted messages from MAX be saved in Telegram with a special mark?
 save_deleted: true

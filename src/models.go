@@ -164,6 +164,7 @@ type Config struct {
 	DownloadPath         string      `yaml:"download_path"`
 	VideoHeaders         string      `yaml:"video_headers"`
 	AudioHeaders         string      `yaml:"audio_headers"`
+	SyncHistoryDepth     int         `yaml:"sync_history_depth"`
 	SaveDeleted          bool        `yaml:"save_deleted"`
 	TruncateLongMessages bool        `yaml:"truncate_long_messages"`
 

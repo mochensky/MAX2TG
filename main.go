@@ -164,7 +164,7 @@ func HandleControlMessage(message src.Message, userNames map[string]string) stri
 	return ""
 }
 
-func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames map[string]string, cfg *src.Config) {
+func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames map[string]string, channelNames map[int]string, cfg *src.Config) {
 	route := sender.FindRoute(message.ChatID)
 	if route == nil {
 		return
@@ -195,6 +195,19 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 				userNames[fwdSenderIDStr] = strings.TrimSpace(contact.FirstName + " " + contact.LastName)
 			} else {
 				userNames[fwdSenderIDStr] = fwdSenderIDStr
+			}
+		}
+	}
+
+	if message.ForwardedMessage != nil && message.ForwardedMessage.Channel != nil && message.ForwardedMessage.Channel.ID != 0 {
+		channelID := message.ForwardedMessage.Channel.ID
+		if _, ok := channelNames[channelID]; !ok {
+			if message.ForwardedMessage.Channel.Name != "" {
+				channelNames[channelID] = message.ForwardedMessage.Channel.Name
+			} else if channelID < 0 {
+				if chats, err := client.GetChatInfo([]int{channelID}); err == nil && len(chats) > 0 {
+					channelNames[channelID] = chats[0].Title
+				}
 			}
 		}
 	}
@@ -413,7 +426,7 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 	src.Logf("Message %d sent to Telegram with TG ID %d", message.ID, tgMsgID)
 }
 
-func HandleEditedMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames map[string]string, cfg *src.Config) {
+func HandleEditedMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames map[string]string, channelNames map[int]string, cfg *src.Config) {
 	route := sender.FindRoute(message.ChatID)
 	if route == nil {
 		return
@@ -478,7 +491,7 @@ func HandleEditedMessage(client *src.Client, db *src.Database, sender *src.Teleg
 	}
 }
 
-func HandleDeletedMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames map[string]string, cfg *src.Config) {
+func HandleDeletedMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames map[string]string, channelNames map[int]string, cfg *src.Config) {
 	route := sender.FindRoute(message.ChatID)
 	if route == nil {
 		return
@@ -556,10 +569,10 @@ func HandleDeletedMessage(client *src.Client, db *src.Database, sender *src.Tele
 	}
 }
 
-func SyncChatHistory(client *src.Client, db *src.Database, sender *src.TelegramSender, userNames map[string]string, cfg *src.Config, chatID int) {
+func SyncChatHistory(client *src.Client, db *src.Database, sender *src.TelegramSender, userNames map[string]string, channelNames map[int]string, cfg *src.Config, chatID int) {
 	src.Logf("Starting chat history synchronization for chat %d...", chatID)
 
-	messages, err := client.GetMessages(chatID, 30, 0, nil)
+	messages, err := client.GetMessages(chatID, cfg.SyncHistoryDepth, 0, nil)
 	if err != nil {
 		src.Logf("Failed to get chat history: %v", err)
 		return
@@ -573,7 +586,7 @@ func SyncChatHistory(client *src.Client, db *src.Database, sender *src.TelegramS
 		existing, _ := db.GetMessageByMaxID(int64(msg.ID))
 		if existing == nil {
 			src.Logf("Found historical message %d, sending to Telegram", msg.ID)
-			ProcessMessage(client, db, sender, msg, userNames, cfg)
+			ProcessMessage(client, db, sender, msg, userNames, channelNames, cfg)
 		} else {
 			if msg.Status == src.MessageStatusEDITED {
 				updateTime := src.GetMessageTime(msg)
@@ -583,7 +596,7 @@ func SyncChatHistory(client *src.Client, db *src.Database, sender *src.TelegramS
 				storedEditTime := existing["edited_at"].(int64)
 				if updateTime > storedEditTime {
 					src.Logf("Message %d was edited, updating in Telegram", msg.ID)
-					HandleEditedMessage(client, db, sender, msg, userNames, cfg)
+					HandleEditedMessage(client, db, sender, msg, userNames, channelNames, cfg)
 				}
 			}
 		}
@@ -645,19 +658,20 @@ func main() {
 	telegramSender := src.NewTelegramSender(cfg.TGToken, cfg.ChatRoutes, cfg)
 
 	userNames := make(map[string]string)
+	channelNames := make(map[int]string)
 
 	client := src.NewClient(cfg)
 
 	client.OnMessage(func(message src.Message) {
-		ProcessMessage(client, db, telegramSender, message, userNames, cfg)
+		ProcessMessage(client, db, telegramSender, message, userNames, channelNames, cfg)
 	})
 
 	client.OnEdited(func(message src.Message) {
-		HandleEditedMessage(client, db, telegramSender, message, userNames, cfg)
+		HandleEditedMessage(client, db, telegramSender, message, userNames, channelNames, cfg)
 	})
 
 	client.OnDeleted(func(message src.Message) {
-		HandleDeletedMessage(client, db, telegramSender, message, userNames, cfg)
+		HandleDeletedMessage(client, db, telegramSender, message, userNames, channelNames, cfg)
 	})
 
 	client.OnDisconnected(func(reason string) {
@@ -678,7 +692,7 @@ func main() {
 					src.Logf("Failed to subscribe to chat %d after reconnect: %v", route.MaxChatID, err)
 				}
 			}
-			SyncChatHistory(client, db, telegramSender, userNames, cfg, route.MaxChatID)
+			SyncChatHistory(client, db, telegramSender, userNames, channelNames, cfg, route.MaxChatID)
 		}
 	})
 
@@ -718,7 +732,7 @@ func main() {
 			}
 		}
 
-		SyncChatHistory(client, db, telegramSender, userNames, cfg, route.MaxChatID)
+		SyncChatHistory(client, db, telegramSender, userNames, channelNames, cfg, route.MaxChatID)
 	}
 
 	select {}
