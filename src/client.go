@@ -495,3 +495,30 @@ func (c *Client) GetFileLink(fileAttachment Attachment, message Message) (string
 	}
 	return url, nil
 }
+
+func (c *Client) GetChatInfo(chatIDs []int) ([]Chat, error) {
+	if !c.connection.IsConnected() {
+		return nil, NewConnectionError("WebSocket not connected")
+	}
+	reqData := c.connection.GetRequestBuilder().GetChats(chatIDs)
+	response, err := c.connection.sendAndReceive(reqData, 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	opcodeFloat, _ := response["opcode"].(float64)
+	cmdFloat, _ := response["cmd"].(float64)
+	opcode := int(opcodeFloat)
+	cmd := int(cmdFloat)
+	if opcode != int(GET_CHATS) || cmd != 1 {
+		return nil, NewInvalidResponseError("invalid chats response")
+	}
+	payload, ok := response["payload"].(map[string]interface{})
+	if !ok {
+		return nil, NewInvalidResponseError("invalid chats response payload")
+	}
+	chatsData, ok := payload["chats"].([]interface{})
+	if !ok {
+		return nil, NewInvalidResponseError("missing chats in response")
+	}
+	return parseChats(castToMapArray(chatsData)), nil
+}

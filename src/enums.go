@@ -13,6 +13,7 @@ const (
 	INIT           Opcode = 6
 	AUTH           Opcode = 19
 	GET_CONTACTS   Opcode = 32
+	GET_CHATS      Opcode = 48
 	GET_MESSAGES   Opcode = 49
 	SUBSCRIBE_CHAT Opcode = 75
 	GET_VIDEO      Opcode = 83

@@ -390,6 +390,24 @@ func parseForwardedMessage(linkData map[string]interface{}) *ForwardedMessage {
 		forwarded.Channel = channel
 	}
 
+	if forwarded.Channel == nil {
+		if chatName, ok := linkData["chatName"].(string); ok && chatName != "" {
+			channel := &Channel{}
+			channel.ID = ParseID(linkData["chatId"])
+			channel.Name = chatName
+			if accessType, ok := linkData["chatAccessType"].(string); ok {
+				channel.AccessType = &accessType
+			}
+			if chatLink, ok := linkData["chatLink"].(string); ok {
+				channel.Link = &chatLink
+			}
+			if chatIconUrl, ok := linkData["chatIconUrl"].(string); ok {
+				channel.IconURL = &chatIconUrl
+			}
+			forwarded.Channel = channel
+		}
+	}
+
 	if elements, ok := messageData["elements"].([]interface{}); ok {
 		forwarded.Elements = make([]map[string]interface{}, len(elements))
 		for i, elem := range elements {

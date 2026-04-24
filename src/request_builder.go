@@ -119,3 +119,10 @@ func (rb *RequestBuilder) SubscribeToChat(chatID int, subscribe bool) WebSocketP
 	}
 	return rb.buildBaseRequest(SUBSCRIBE_CHAT, payload)
 }
+
+func (rb *RequestBuilder) GetChats(chatIDs []int) WebSocketPayload {
+	payload := map[string]interface{}{
+		"chatIds": chatIDs,
+	}
+	return rb.buildBaseRequest(GET_CHATS, payload)
+}
