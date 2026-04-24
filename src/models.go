@@ -156,15 +156,16 @@ type Config struct {
 	DeviceID  string           `yaml:"device_id"`
 	UserAgent *UserAgentConfig `yaml:"user_agent"`
 
-	ChatRoutes    []ChatRoute `yaml:"chats"`
-	TGToken       string      `yaml:"tg_token"`
-	TGDebugUserID int64       `yaml:"tg_debug_user_id"`
-	LogPath       string      `yaml:"log_path"`
-	DBPath        string      `yaml:"db_path"`
-	DownloadPath  string      `yaml:"download_path"`
-	VideoHeaders  string      `yaml:"video_headers"`
-	AudioHeaders  string      `yaml:"audio_headers"`
-	SaveDeleted   bool        `yaml:"save_deleted"`
+	ChatRoutes           []ChatRoute `yaml:"chats"`
+	TGToken              string      `yaml:"tg_token"`
+	TGDebugUserID        int64       `yaml:"tg_debug_user_id"`
+	LogPath              string      `yaml:"log_path"`
+	DBPath               string      `yaml:"db_path"`
+	DownloadPath         string      `yaml:"download_path"`
+	VideoHeaders         string      `yaml:"video_headers"`
+	AudioHeaders         string      `yaml:"audio_headers"`
+	SaveDeleted          bool        `yaml:"save_deleted"`
+	TruncateLongMessages bool        `yaml:"truncate_long_messages"`
 
 	MaxRetries     int           `yaml:"max_retries"`
 	BaseRetryDelay time.Duration `yaml:"base_retry_delay"`

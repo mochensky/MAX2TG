@@ -12,7 +12,7 @@ import (
 
 const (
 	AppName             = "max2tg"
-	AppVersion          = "1.0.2"
+	AppVersion          = "1.0.3"
 	DefaultLogPath      = "data/logs"
 	DefaultDBPath       = "data/database.db"
 	DefaultDownloadPath = "data/downloads"
@@ -22,7 +22,7 @@ var DefaultConfig = &Config{
 	Token:    "",
 	DeviceID: "",
 	UserAgent: &UserAgentConfig{
-		UserAgent:    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.3.0.0 Safari/537.36",
+		UserAgent:    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.3.3.886 Safari/537.36",
 		Locale:       "ru",
 		DeviceLocale: "ru",
 		OSVersion:    "Windows",
@@ -64,7 +64,8 @@ Accept-Encoding: identity
 Priority: u=4
 Pragma: no-cache
 Cache-Control: no-cache`,
-	SaveDeleted: true,
+	SaveDeleted:          true,
+	TruncateLongMessages: true,
 
 	MaxRetries:     5,
 	BaseRetryDelay: 1 * time.Second,
@@ -209,6 +210,9 @@ download_path: "%s"
 # will deleted messages from MAX be saved in Telegram with a special mark?
 save_deleted: true
 
+# truncate long messages instead of skipping them (caption limit: 1024 chars, message limit: 4096 chars)
+truncate_long_messages: true
+
 # reconnect configuration
 max_retries: 5
 base_retry_delay: 1s
@@ -266,7 +270,7 @@ audio_headers: |
   Cache-Control: no-cache
 
 user_agent:
-  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.3.0.0 Safari/537.36"
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.3.3.886 Safari/537.36"
   locale: "ru"
   device_locale: "ru"
   os_version: "Windows"

@@ -235,3 +235,121 @@ func DownloadAudio(urlStr string, audioID int, downloadPath string, audioHeaders
 	Logf("Audio downloaded: %s", filePath)
 	return filePath
 }
+
+func CountVisibleCharacters(text string) int {
+	count := 0
+	inTag := false
+	for _, r := range text {
+		if r == '<' {
+			inTag = true
+		} else if r == '>' {
+			inTag = false
+		} else if !inTag {
+			count++
+		}
+	}
+	return count
+}
+
+func TruncateMessage(text string, isCaption bool) (string, bool) {
+	maxLen := 4096
+	if isCaption {
+		maxLen = 1024
+	}
+
+	visibleLen := CountVisibleCharacters(text)
+	if visibleLen <= maxLen {
+		return text, false
+	}
+
+	targetLen := maxLen - 3
+	result := ""
+	count := 0
+	inTag := false
+	var tagBuffer strings.Builder
+
+	for _, r := range text {
+		if r == '<' {
+			inTag = true
+			tagBuffer.Reset()
+			tagBuffer.WriteRune(r)
+		} else if r == '>' {
+			inTag = false
+			tagBuffer.WriteRune(r)
+			result += tagBuffer.String()
+		} else if inTag {
+			tagBuffer.WriteRune(r)
+		} else {
+			if count >= targetLen {
+				result += closeOpenTags(result) + "..."
+				return result, true
+			}
+			result += string(r)
+			count++
+		}
+	}
+
+	return result, false
+}
+
+func closeOpenTags(text string) string {
+	openTags := []string{}
+	i := 0
+	for i < len(text) {
+		if i < len(text)-1 && text[i:i+2] == "</" {
+			endIdx := strings.Index(text[i:], ">")
+			if endIdx != -1 {
+				tagName := strings.TrimSpace(text[i+2 : i+endIdx])
+				if len(openTags) > 0 && openTags[len(openTags)-1] == tagName {
+					openTags = openTags[:len(openTags)-1]
+				}
+				i += endIdx + 1
+			} else {
+				i++
+			}
+		} else if text[i] == '<' {
+			endIdx := strings.Index(text[i:], ">")
+			if endIdx != -1 {
+				tagContent := text[i+1 : i+endIdx]
+				tagName := strings.Fields(tagContent)[0]
+				if !strings.HasSuffix(tagContent, "/") && !strings.Contains(tagContent, "/") {
+					openTags = append(openTags, tagName)
+				}
+				i += endIdx + 1
+			} else {
+				i++
+			}
+		} else {
+			i++
+		}
+	}
+
+	result := ""
+	for i := len(openTags) - 1; i >= 0; i-- {
+		result += "</" + openTags[i] + ">"
+	}
+	return result
+}
+
+func CheckAndHandleMessageLength(text string, isCaption bool, truncate bool) (string, bool) {
+	if truncate {
+		newText, wasTruncated := TruncateMessage(text, isCaption)
+		if wasTruncated {
+			Logf("Message was truncated to fit Telegram limits")
+		}
+		return newText, true
+	}
+
+	maxLen := 4096
+	if isCaption {
+		maxLen = 1024
+	}
+
+	visibleLen := CountVisibleCharacters(text)
+	if visibleLen > maxLen {
+		Logf("Message is too long (%d chars, max %d). Skipping send.", visibleLen, maxLen)
+		return text, false
+	}
+
+	return text, true
+}

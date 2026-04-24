@@ -18,6 +18,7 @@ type TelegramSender struct {
 	routes         []ChatRoute
 	maxRetries     int
 	baseRetryDelay time.Duration
+	config         *Config
 }
 
 func NewTelegramSender(botToken string, routes []ChatRoute, cfg *Config) *TelegramSender {
@@ -30,6 +31,7 @@ func NewTelegramSender(botToken string, routes []ChatRoute, cfg *Config) *Telegr
 		routes:         routes,
 		maxRetries:     cfg.MaxRetries,
 		baseRetryDelay: cfg.BaseRetryDelay,
+		config:         cfg,
 	}
 }
 
@@ -74,6 +76,12 @@ func (s *TelegramSender) SendMessage(text string, maxChatID int, replyToMessageI
 	if route == nil {
 		return 0, fmt.Errorf("no route found for MAX chat ID %d", maxChatID)
 	}
+
+	processedText, shouldSend := CheckAndHandleMessageLength(text, false, s.config.TruncateLongMessages)
+	if !shouldSend {
+		return 0, fmt.Errorf("message too long and truncation disabled")
+	}
+	text = processedText
 
 	var lastErr error
 
@@ -156,6 +164,14 @@ func (s *TelegramSender) SendMediaGroup(files []string, caption string, maxChatI
 	route := s.FindRoute(maxChatID)
 	if route == nil {
 		return nil, fmt.Errorf("no route found for MAX chat ID %d", maxChatID)
+	}
+
+	if caption != "" {
+		processedCaption, shouldSend := CheckAndHandleMessageLength(caption, true, s.config.TruncateLongMessages)
+		if !shouldSend {
+			return nil, fmt.Errorf("caption too long and truncation disabled")
+		}
+		caption = processedCaption
 	}
 
 	var lastErr error
@@ -275,6 +291,14 @@ func (s *TelegramSender) SendAudio(filePath string, caption string, maxChatID in
 		return 0, fmt.Errorf("no route found for MAX chat ID %d", maxChatID)
 	}
 
+	if caption != "" {
+		processedCaption, shouldSend := CheckAndHandleMessageLength(caption, true, s.config.TruncateLongMessages)
+		if !shouldSend {
+			return 0, fmt.Errorf("caption too long and truncation disabled")
+		}
+		caption = processedCaption
+	}
+
 	var lastErr error
 
 	for attempt := 0; attempt < s.maxRetries; attempt++ {
@@ -383,6 +407,12 @@ func (s *TelegramSender) EditMessageText(messageID int, text string, maxChatID i
 		return fmt.Errorf("no route found for MAX chat ID %d", maxChatID)
 	}
 
+	processedText, shouldSend := CheckAndHandleMessageLength(text, false, s.config.TruncateLongMessages)
+	if !shouldSend {
+		return fmt.Errorf("message too long and truncation disabled")
+	}
+	text = processedText
+
 	var lastErr error
 
 	for attempt := 0; attempt < s.maxRetries; attempt++ {
@@ -454,6 +484,14 @@ func (s *TelegramSender) EditMessageCaption(messageID int, caption string, maxCh
 	route := s.FindRoute(maxChatID)
 	if route == nil {
 		return fmt.Errorf("no route found for MAX chat ID %d", maxChatID)
+	}
+
+	if caption != "" {
+		processedCaption, shouldSend := CheckAndHandleMessageLength(caption, true, s.config.TruncateLongMessages)
+		if !shouldSend {
+			return fmt.Errorf("caption too long and truncation disabled")
+		}
+		caption = processedCaption
 	}
 
 	var lastErr error
