@@ -704,51 +704,6 @@ func parseContacts(contactsData []map[string]interface{}) []Contact {
 	return contacts
 }
 
-func parseFolder(folderData map[string]interface{}) Folder {
-	folder := Folder{}
-
-	folder.ID = ParseID(folderData["id"])
-	if title, ok := folderData["title"].(string); ok {
-		folder.Title = title
-	}
-	if include, ok := folderData["include"].([]interface{}); ok {
-		folder.Include = make([]int, len(include))
-		for i, v := range include {
-			folder.Include[i] = ParseID(v)
-		}
-	}
-	if filters, ok := folderData["filters"].([]interface{}); ok {
-		folder.Filters = make([]int, len(filters))
-		for i, v := range filters {
-			folder.Filters[i] = ParseID(v)
-		}
-	}
-	if options, ok := folderData["options"].([]interface{}); ok {
-		folder.Options = make([]string, len(options))
-		for i, opt := range options {
-			if optStr, ok := opt.(string); ok {
-				folder.Options[i] = optStr
-			}
-		}
-	}
-	if updateTimeVal := folderData["updateTime"]; updateTimeVal != nil {
-		if ut, ok := parseInt64(updateTimeVal); ok {
-			folder.UpdateTime = ut
-		}
-	}
-	folder.SourceID = ParseID(folderData["sourceId"])
-
-	return folder
-}
-
-func parseFolders(foldersData []map[string]interface{}) []Folder {
-	folders := make([]Folder, len(foldersData))
-	for i, folderData := range foldersData {
-		folders[i] = parseFolder(folderData)
-	}
-	return folders
-}
-
 func FormatTime(timestamp int64) string {
 	if timestamp == 0 {
 		return ""

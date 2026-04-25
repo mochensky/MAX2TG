@@ -354,33 +354,6 @@ func (c *Client) GetContacts(contactIDs []int) ([]Contact, error) {
 	return parseContacts(castToMapArray(contactsData)), nil
 }
 
-func (c *Client) GetFolders() ([]Folder, error) {
-	if !c.connection.IsConnected() {
-		return nil, NewConnectionError("WebSocket not connected")
-	}
-	reqData := c.connection.GetRequestBuilder().GetFolders()
-	response, err := c.connection.sendAndReceive(reqData, 10*time.Second)
-	if err != nil {
-		return nil, err
-	}
-	opcodeFloat, _ := response["opcode"].(float64)
-	cmdFloat, _ := response["cmd"].(float64)
-	opcode := int(opcodeFloat)
-	cmd := int(cmdFloat)
-	if opcode != int(GET_FOLDERS) || cmd != 1 {
-		return nil, NewInvalidResponseError("invalid folders response")
-	}
-	payload, ok := response["payload"].(map[string]interface{})
-	if !ok {
-		return nil, NewInvalidResponseError("invalid folders response payload")
-	}
-	foldersData, ok := payload["folders"].([]interface{})
-	if !ok {
-		return nil, NewInvalidResponseError("missing folders in response")
-	}
-	return parseFolders(castToMapArray(foldersData)), nil
-}
-
 func (c *Client) GetMessages(chatID int, backward, forward int, fromTime *int64) ([]Message, error) {
 	if !c.connection.IsConnected() {
 		return nil, NewConnectionError("WebSocket not connected")

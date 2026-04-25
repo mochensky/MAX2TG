@@ -19,7 +19,6 @@ const (
 	GET_VIDEO      Opcode = 83
 	GET_FILE       Opcode = 88
 	ON_MESSAGE     Opcode = 128
-	GET_FOLDERS    Opcode = 272
 )
 
 type MessageStatus int32

@@ -87,13 +87,6 @@ func (rb *RequestBuilder) GetChatMessages(chatID int, fromTime int64, forward, b
 	return rb.buildBaseRequest(GET_MESSAGES, payload)
 }
 
-func (rb *RequestBuilder) GetFolders() WebSocketPayload {
-	payload := map[string]interface{}{
-		"folderSync": 0,
-	}
-	return rb.buildBaseRequest(GET_FOLDERS, payload)
-}
-
 func (rb *RequestBuilder) GetVideoLink(videoID, chatID, messageID int) WebSocketPayload {
 	payload := map[string]interface{}{
 		"videoId":   videoID,

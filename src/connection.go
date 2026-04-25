@@ -190,11 +190,6 @@ func (c *Connection) Authenticate(chatsCount int) (WebSocketPayload, error) {
 		return nil, NewInvalidTokenError("authentication failed: no profile data")
 	}
 
-	if token, ok := payload["token"].(string); ok && token != "" {
-		c.config.Token = token
-		Logf("Token updated after authentication")
-	}
-
 	return response, nil
 }
 
