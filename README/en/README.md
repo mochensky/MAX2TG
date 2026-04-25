@@ -104,15 +104,21 @@ chats:
 ### 4. Other Parameters in `config.yml`
 
 ```yaml
-# Mark deleted messages with a marker instead of deleting them
-save_deleted: true
-
-# Data paths
+# data paths
 log_path: "data/logs"
 db_path: "data/database.db"
 download_path: "data/downloads"
 
-# Reconnection settings
+# how many recent chat messages will be checked for chat sync?
+sync_history_depth: 30
+
+# mark deleted messages with a marker instead of deleting them
+save_deleted: true
+
+# truncate long messages instead of skipping them (caption limit: 1024 chars, message limit: 4096 chars)
+truncate_long_messages: true
+
+# reconnection settings
 max_retries: 5
 base_retry_delay: 1s
 ping_timeout: 90s
