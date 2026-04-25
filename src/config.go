@@ -11,30 +11,32 @@ import (
 )
 
 const (
-	AppName             = "max2tg"
-	AppVersion          = "1.0.5"
+	AppName    = "max2tg"
+	AppVersion = "1.0.6"
+
 	DefaultLogPath      = "data/logs"
 	DefaultDBPath       = "data/database.db"
 	DefaultDownloadPath = "data/downloads"
-)
 
-var DefaultConfig = &Config{
-	Token:    "",
-	DeviceID: "",
-	UserAgent: &UserAgentConfig{
-		UserAgent:    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.3.3.886 Safari/537.36",
-		Locale:       "ru",
-		DeviceLocale: "ru",
-		OSVersion:    "Windows",
-		DeviceName:   "Firefox",
-		AppVersion:   "26.4.7",
-		Screen:       "1920x1080 1.0x",
-		Timezone:     "Europe/Moscow",
-	},
-	LogPath:      DefaultLogPath,
-	DBPath:       DefaultDBPath,
-	DownloadPath: DefaultDownloadPath,
-	VideoHeaders: `Accept: video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5
+	DefaultLogTimezone          = "Europe/Moscow"
+	DefaultSyncHistoryDepth     = 30
+	DefaultSaveDeleted          = true
+	DefaultTruncateLongMessages = true
+
+	DefaultMaxRetries     = 5
+	DefaultBaseRetryDelay = 1 * time.Second
+	DefaultPingTimeout    = 90 * time.Second
+
+	DefaultUserAgent    = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.3.3.886 Safari/537.36"
+	DefaultLocale       = "ru"
+	DefaultDeviceLocale = "ru"
+	DefaultOSVersion    = "Windows"
+	DefaultDeviceName   = "YandexBrowser"
+	DefaultUAAppVersion = "26.4.7"
+	DefaultScreen       = "1920x1080 1.0x"
+	DefaultUATimezone   = "Europe/Moscow"
+
+	DefaultVideoHeaders = `Accept: video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5
 Accept-Language: ru-RU,ru;q=0.5
 Range: bytes=0-
 Connection: keep-alive
@@ -48,8 +50,9 @@ Sec-GPC: 1
 Accept-Encoding: identity
 Priority: u=4
 Pragma: no-cache
-Cache-Control: no-cache`,
-	AudioHeaders: `Accept: audio/webm,audio/ogg,audio/wav,audio/*;q=0.9,application/ogg;q=0.7,video/*;q=0.6,*/*;q=0.5
+Cache-Control: no-cache`
+
+	DefaultAudioHeaders = `Accept: audio/webm,audio/ogg,audio/wav,audio/*;q=0.9,application/ogg;q=0.7,video/*;q=0.6,*/*;q=0.5
 Accept-Language: ru-RU,ru;q=0.9
 Range: bytes=0-
 Sec-Fetch-Storage-Access: none
@@ -63,14 +66,35 @@ Sec-GPC: 1
 Accept-Encoding: identity
 Priority: u=4
 Pragma: no-cache
-Cache-Control: no-cache`,
-	SyncHistoryDepth:     30,
-	SaveDeleted:          true,
-	TruncateLongMessages: true,
+Cache-Control: no-cache`
+)
 
-	MaxRetries:     5,
-	BaseRetryDelay: 1 * time.Second,
-	PingTimeout:    90 * time.Second,
+var DefaultConfig = &Config{
+	Token:    "",
+	DeviceID: "",
+
+	LogPath:              DefaultLogPath,
+	DBPath:               DefaultDBPath,
+	DownloadPath:         DefaultDownloadPath,
+	LogTimezone:          DefaultLogTimezone,
+	SyncHistoryDepth:     DefaultSyncHistoryDepth,
+	SaveDeleted:          DefaultSaveDeleted,
+	TruncateLongMessages: DefaultTruncateLongMessages,
+	MaxRetries:           DefaultMaxRetries,
+	BaseRetryDelay:       DefaultBaseRetryDelay,
+	PingTimeout:          DefaultPingTimeout,
+	VideoHeaders:         DefaultVideoHeaders,
+	AudioHeaders:         DefaultAudioHeaders,
+	UserAgent: &UserAgentConfig{
+		UserAgent:    DefaultUserAgent,
+		Locale:       DefaultLocale,
+		DeviceLocale: DefaultDeviceLocale,
+		OSVersion:    DefaultOSVersion,
+		DeviceName:   DefaultDeviceName,
+		AppVersion:   DefaultUAAppVersion,
+		Screen:       DefaultScreen,
+		Timezone:     DefaultUATimezone,
+	},
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -95,7 +119,7 @@ func LoadConfig(configPath string) (*Config, error) {
 		if err := yaml.Unmarshal(data, cfg); err != nil {
 			return nil, fmt.Errorf("failed to parse newly created config: %w", err)
 		}
-		fmt.Printf("[%s] Created default config at %s\n", time.Now().Format("02.01.2006 15:04:05"), configPath)
+		fmt.Printf("Created default config at %s\n", configPath)
 	} else {
 		return nil, fmt.Errorf("error checking config file: %w", err)
 	}
@@ -120,7 +144,7 @@ TG_DEBUG_USER_ID=your_telegram_user_id_for_debug_messages
 	}
 
 	if err := godotenv.Load(envPath); err != nil {
-		fmt.Printf("[%s] Warning: .env file found but could not be loaded: %v\n", time.Now().Format("02.01.2006 15:04:05"), err)
+		fmt.Printf("Warning: .env file found but could not be loaded: %v\n", err)
 	}
 
 	if token := os.Getenv("MAX_TOKEN"); token != "" {
@@ -208,19 +232,22 @@ log_path: "%s"
 db_path: "%s"
 download_path: "%s"
 
+# timezone for log timestamps (IANA format, e.g. Europe/Moscow, America/New_York, UTC)
+log_timezone: "%s"
+
 # how many recent chat messages will be checked for chat sync?
-sync_history_depth: 30
+sync_history_depth: %d
 
 # will deleted messages from MAX be saved in Telegram with a special mark?
-save_deleted: true
+save_deleted: %t
 
 # truncate long messages instead of skipping them (caption limit: 1024 chars, message limit: 4096 chars)
-truncate_long_messages: true
+truncate_long_messages: %t
 
 # reconnect configuration
-max_retries: 5
-base_retry_delay: 1s
-ping_timeout: 90s
+max_retries: %d
+base_retry_delay: %s
+ping_timeout: %s
 
 # chat routing configuration
 chats:
@@ -238,6 +265,16 @@ chats:
   # - max_chat_id: 987654321
   #   telegram_chat_id: -1009876543210
   #   telegram_topic_id: 0
+
+user_agent:
+  user_agent: "%s"
+  locale: "%s"
+  device_locale: "%s"
+  os_version: "%s"
+  device_name: "%s"
+  app_version: "%s"
+  screen: "%s"
+  timezone: "%s"
 
 video_headers: |
   Accept: video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5
@@ -272,17 +309,25 @@ audio_headers: |
   Priority: u=4
   Pragma: no-cache
   Cache-Control: no-cache
-
-user_agent:
-  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 YaBrowser/26.3.3.886 Safari/537.36"
-  locale: "ru"
-  device_locale: "ru"
-  os_version: "Windows"
-  device_name: "YandexBrowser"
-  app_version: "26.4.7"
-  screen: "1920x1080 1.0x"
-  timezone: "Europe/Moscow"
-`, AppName, AppVersion, DefaultLogPath, DefaultDBPath, DefaultDownloadPath)
+`,
+		AppName, AppVersion,
+		DefaultLogPath, DefaultDBPath, DefaultDownloadPath,
+		DefaultLogTimezone,
+		DefaultSyncHistoryDepth,
+		DefaultSaveDeleted,
+		DefaultTruncateLongMessages,
+		DefaultMaxRetries,
+		DefaultBaseRetryDelay,
+		DefaultPingTimeout,
+		DefaultUserAgent,
+		DefaultLocale,
+		DefaultDeviceLocale,
+		DefaultOSVersion,
+		DefaultDeviceName,
+		DefaultUAAppVersion,
+		DefaultScreen,
+		DefaultUATimezone,
+	)
 
 	return os.WriteFile(path, []byte(yamlContent), 0644)
 }

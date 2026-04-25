@@ -606,8 +606,6 @@ func SyncChatHistory(client *src.Client, db *src.Database, sender *src.TelegramS
 }
 
 func main() {
-	timeFormat := "02.01.2006 15:04:05"
-
 	configPath := "data/config.yml"
 	if len(os.Args) > 1 {
 		configPath = os.Args[1]
@@ -615,12 +613,12 @@ func main() {
 
 	cfg, err := src.LoadConfig(configPath)
 	if err != nil {
-		fmt.Printf("[%s] Failed to load config: %v\n", time.Now().Format(timeFormat), err)
+		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := src.SetupLogger(cfg.LogPath); err != nil {
-		fmt.Printf("[%s] Failed to setup logger: %v\n", time.Now().Format(timeFormat), err)
+	if err := src.SetupLogger(cfg.LogPath, cfg.LogTimezone); err != nil {
+		fmt.Printf("Failed to setup logger: %v\n", err)
 		os.Exit(1)
 	}
 	defer src.CloseLogger()
@@ -687,11 +685,11 @@ func main() {
 			telegramSender.SendDebugMessage("Reconnected!", cfg.TGDebugUserID)
 		}
 		for _, route := range cfg.ChatRoutes {
-			if route.MaxChatID != 0 {
-				if err := client.SubscribeToChat(route.MaxChatID); err != nil {
-					src.Logf("Failed to subscribe to chat %d after reconnect: %v", route.MaxChatID, err)
-				}
-			}
+			// if route.MaxChatID != 0 {
+			// 	if err := client.SubscribeToChat(route.MaxChatID); err != nil {
+			// 		src.Logf("Failed to subscribe to chat %d after reconnect: %v", route.MaxChatID, err)
+			// 	}
+			// }
 			SyncChatHistory(client, db, telegramSender, userNames, channelNames, cfg, route.MaxChatID)
 		}
 	})
@@ -725,12 +723,12 @@ func main() {
 			}
 		}
 
-		if route.MaxChatID != 0 {
-			if err := client.SubscribeToChat(route.MaxChatID); err != nil {
-				src.Logf("Failed to subscribe to chat %d: %v", route.MaxChatID, err)
-				continue
-			}
-		}
+		// if route.MaxChatID != 0 {
+		// 	if err := client.SubscribeToChat(route.MaxChatID); err != nil {
+		// 		src.Logf("Failed to subscribe to chat %d: %v", route.MaxChatID, err)
+		// 		continue
+		// 	}
+		// }
 
 		SyncChatHistory(client, db, telegramSender, userNames, channelNames, cfg, route.MaxChatID)
 	}

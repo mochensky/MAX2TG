@@ -124,16 +124,6 @@ type Chat struct {
 	Owner        *int        `json:"owner,omitempty"`
 }
 
-type Folder struct {
-	ID         int      `json:"id"`
-	Title      string   `json:"title"`
-	Include    []int    `json:"include"`
-	Filters    []int    `json:"filters"`
-	Options    []string `json:"options"`
-	UpdateTime int64    `json:"update_time"`
-	SourceID   int      `json:"source_id"`
-}
-
 type UserAgentConfig struct {
 	UserAgent    string `yaml:"user_agent"`
 	Locale       string `yaml:"locale"`
@@ -152,25 +142,30 @@ type ChatRoute struct {
 }
 
 type Config struct {
-	Token     string           `yaml:"token"`
-	DeviceID  string           `yaml:"device_id"`
-	UserAgent *UserAgentConfig `yaml:"user_agent"`
+	Token    string `yaml:"token"`
+	DeviceID string `yaml:"device_id"`
 
-	ChatRoutes           []ChatRoute `yaml:"chats"`
-	TGToken              string      `yaml:"tg_token"`
-	TGDebugUserID        int64       `yaml:"tg_debug_user_id"`
-	LogPath              string      `yaml:"log_path"`
-	DBPath               string      `yaml:"db_path"`
-	DownloadPath         string      `yaml:"download_path"`
-	VideoHeaders         string      `yaml:"video_headers"`
-	AudioHeaders         string      `yaml:"audio_headers"`
-	SyncHistoryDepth     int         `yaml:"sync_history_depth"`
-	SaveDeleted          bool        `yaml:"save_deleted"`
-	TruncateLongMessages bool        `yaml:"truncate_long_messages"`
+	TGToken       string `yaml:"tg_token"`
+	TGDebugUserID int64  `yaml:"tg_debug_user_id"`
+
+	LogPath      string `yaml:"log_path"`
+	DBPath       string `yaml:"db_path"`
+	DownloadPath string `yaml:"download_path"`
+
+	LogTimezone          string `yaml:"log_timezone"`
+	SyncHistoryDepth     int    `yaml:"sync_history_depth"`
+	SaveDeleted          bool   `yaml:"save_deleted"`
+	TruncateLongMessages bool   `yaml:"truncate_long_messages"`
+
+	ChatRoutes []ChatRoute `yaml:"chats"`
 
 	MaxRetries     int           `yaml:"max_retries"`
 	BaseRetryDelay time.Duration `yaml:"base_retry_delay"`
 	PingTimeout    time.Duration `yaml:"ping_timeout"`
+
+	UserAgent    *UserAgentConfig `yaml:"user_agent"`
+	VideoHeaders string           `yaml:"video_headers"`
+	AudioHeaders string           `yaml:"audio_headers"`
 }
 
 func (c *Config) GetTimeZoneLocation() *time.Location {
