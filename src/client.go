@@ -214,20 +214,21 @@ func (c *Client) Start() error {
 }
 
 func (c *Client) runEventLoop() {
+	wasConnected := true
 	for c.running && !c.stopping {
 		select {
 		case <-time.After(10 * time.Millisecond):
 		default:
 			if !c.connection.IsConnected() {
-				if !c.connection.IsReconnecting() {
-					reason := "Connection lost"
-					for _, handler := range c.disconnectedHandlers {
-						handler(reason)
-					}
+				if !c.connection.IsReconnecting() && wasConnected {
+					wasConnected = false
+					go c.connection.HandleReconnect("Connection lost")
 				}
 				time.Sleep(1 * time.Second)
 				continue
 			}
+
+			wasConnected = true
 
 			payload, err := c.connection.Receive()
 			if err != nil {

@@ -12,7 +12,7 @@ import (
 
 const (
 	AppName             = "max2tg"
-	AppVersion          = "1.0.4"
+	AppVersion          = "1.0.5"
 	DefaultLogPath      = "data/logs"
 	DefaultDBPath       = "data/database.db"
 	DefaultDownloadPath = "data/downloads"
