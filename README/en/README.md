@@ -135,9 +135,12 @@ The `video_headers`, `audio_headers`, and `user_agent` sections contain working 
 On successful start you will see in the logs:
 
 ```
-[16.04.2026 12:00:00] Starting max2tg...
+[16.04.2026 12:00:00] Starting max2tg 1.0.0...
+[16.04.2026 12:00:00] Application is up to date (1.0.0)
+...
 [16.04.2026 12:00:01] Connected to WebSocket
-[16.04.2026 12:00:01] Connected as Ivan (ID: 12345678)
+...
+[16.04.2026 12:00:01] Connected as Иван (ID: 12345678)
 ```
 
 ## Project Structure
