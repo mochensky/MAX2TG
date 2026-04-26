@@ -128,7 +128,7 @@ truncate_long_messages: true
 # параметры переподключения
 max_retries: 5
 base_retry_delay: 1s
-ping_timeout: 90s
+ping_timeout: 1m30s
 ```
 
 Секции `user_agent`, `video_headers` и `audio_headers` заполнены рабочими значениями по умолчанию и обычно не требуют изменений.
