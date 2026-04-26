@@ -134,6 +134,11 @@ truncate_long_messages: true
 # конфигурация повторных попыток отправлять Telegram сообщения
 max_retries: 5
 base_retry_delay: 1s
+
+# конфигурация повторных попыток скачивания медиа из MAX (фото, видео, файлы, аудио)
+media_download_max_retries: 5
+media_download_retry_delay: 1s
+
 # таймаут для ping WebSocket
 ping_timeout: 1m30s
 

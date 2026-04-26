@@ -134,6 +134,11 @@ truncate_long_messages: true
 # configuration of retries for sending Telegram messages
 max_retries: 5
 base_retry_delay: 1s
+
+# configuration of retries for downloading media from MAX (photos, videos, files, audio)
+media_download_max_retries: 5
+media_download_retry_delay: 1s
+
 # WebSocket ping timeout
 ping_timeout: 1m30s
 
