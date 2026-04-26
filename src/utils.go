@@ -43,11 +43,15 @@ func SanitizeFilename(name string) string {
 	return strings.TrimSpace(safe)
 }
 
-func DownloadPhoto(baseURL, photoToken string, photoID int, downloadPath string, userAgent string) string {
+func DownloadPhoto(baseURL, photoToken string, photoID int, downloadPath string, userAgent string, proxyCfg *ProxyConfig) string {
 	urlStr := fmt.Sprintf("%s&sig=%s", baseURL, photoToken)
 	filePath := filepath.Join(downloadPath, "images", fmt.Sprintf("%d.webp", photoID))
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	client, err := BuildHTTPClientWithProxy(proxyCfg, 60*time.Second)
+	if err != nil {
+		Logf("Failed to configure proxy for photo download %d: %v", photoID, err)
+		client = &http.Client{Timeout: 60 * time.Second}
+	}
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		Logf("Failed to create request for photo %d: %v", photoID, err)
@@ -84,7 +88,7 @@ func DownloadPhoto(baseURL, photoToken string, photoID int, downloadPath string,
 	return filePath
 }
 
-func DownloadVideo(urlStr string, videoID int, downloadPath string, videoHeaders string, userAgent string) string {
+func DownloadVideo(urlStr string, videoID int, downloadPath string, videoHeaders string, userAgent string, proxyCfg *ProxyConfig) string {
 	filePath := filepath.Join(downloadPath, "videos", fmt.Sprintf("%d.mp4", videoID))
 
 	parsedURL, err := url.Parse(urlStr)
@@ -93,7 +97,11 @@ func DownloadVideo(urlStr string, videoID int, downloadPath string, videoHeaders
 		return ""
 	}
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client, err := BuildHTTPClientWithProxy(proxyCfg, 120*time.Second)
+	if err != nil {
+		Logf("Failed to configure proxy for video download %d: %v", videoID, err)
+		client = &http.Client{Timeout: 120 * time.Second}
+	}
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		Logf("Failed to create request for video %d: %v", videoID, err)
@@ -138,14 +146,18 @@ func DownloadVideo(urlStr string, videoID int, downloadPath string, videoHeaders
 	return filePath
 }
 
-func DownloadFile(urlStr string, fileID int, fileName string, downloadPath string, userAgent string) string {
+func DownloadFile(urlStr string, fileID int, fileName string, downloadPath string, userAgent string, proxyCfg *ProxyConfig) string {
 	safeName := SanitizeFilename(fileName)
 	if safeName == "" {
 		safeName = fmt.Sprintf("file-%d", fileID)
 	}
 	filePath := filepath.Join(downloadPath, "files", fmt.Sprintf("%d-%s", fileID, safeName))
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	client, err := BuildHTTPClientWithProxy(proxyCfg, 60*time.Second)
+	if err != nil {
+		Logf("Failed to configure proxy for file download %d: %v", fileID, err)
+		client = &http.Client{Timeout: 60 * time.Second}
+	}
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		Logf("Failed to create request for file %d: %v", fileID, err)
@@ -182,7 +194,7 @@ func DownloadFile(urlStr string, fileID int, fileName string, downloadPath strin
 	return filePath
 }
 
-func DownloadAudio(urlStr string, audioID int, downloadPath string, audioHeaders string, userAgent string) string {
+func DownloadAudio(urlStr string, audioID int, downloadPath string, audioHeaders string, userAgent string, proxyCfg *ProxyConfig) string {
 	filePath := filepath.Join(downloadPath, "audio", fmt.Sprintf("%d.mp3", audioID))
 
 	parsedURL, err := url.Parse(urlStr)
@@ -191,7 +203,11 @@ func DownloadAudio(urlStr string, audioID int, downloadPath string, audioHeaders
 		return ""
 	}
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client, err := BuildHTTPClientWithProxy(proxyCfg, 120*time.Second)
+	if err != nil {
+		Logf("Failed to configure proxy for audio download %d: %v", audioID, err)
+		client = &http.Client{Timeout: 120 * time.Second}
+	}
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		Logf("Failed to create request for audio %d: %v", audioID, err)

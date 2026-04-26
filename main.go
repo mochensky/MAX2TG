@@ -276,11 +276,13 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 	imagePaths := []string{}
 	videoPaths := []string{}
 
+	maxProxy := src.GetMaxProxy(cfg)
+
 	for _, attach := range message.Attaches {
 		switch attach.Type {
 		case src.AttachmentTypeAudio:
 			if attach.AudioURL != "" {
-				path := src.DownloadAudio(attach.AudioURL, attach.AudioID, cfg.DownloadPath, cfg.AudioHeaders, cfg.UserAgent.UserAgent)
+				path := src.DownloadAudio(attach.AudioURL, attach.AudioID, cfg.DownloadPath, cfg.AudioHeaders, cfg.UserAgent.UserAgent, maxProxy)
 				if path != "" {
 					audioPaths = append(audioPaths, path)
 				}
@@ -288,14 +290,14 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 		case src.AttachmentTypeFile:
 			url, err := client.GetFileLink(attach, message)
 			if err == nil {
-				path := src.DownloadFile(url, attach.FileID, attach.FileName, cfg.DownloadPath, cfg.UserAgent.UserAgent)
+				path := src.DownloadFile(url, attach.FileID, attach.FileName, cfg.DownloadPath, cfg.UserAgent.UserAgent, maxProxy)
 				if path != "" {
 					filePaths = append(filePaths, path)
 				}
 			}
 		case src.AttachmentTypePhoto:
 			if attach.BaseURL != "" && attach.PhotoToken != "" {
-				path := src.DownloadPhoto(attach.BaseURL, attach.PhotoToken, attach.PhotoID, cfg.DownloadPath, cfg.UserAgent.UserAgent)
+				path := src.DownloadPhoto(attach.BaseURL, attach.PhotoToken, attach.PhotoID, cfg.DownloadPath, cfg.UserAgent.UserAgent, maxProxy)
 				if path != "" {
 					imagePaths = append(imagePaths, path)
 				}
@@ -303,7 +305,7 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 		case src.AttachmentTypeVideo:
 			url, err := client.GetVideoLink(attach, message)
 			if err == nil {
-				path := src.DownloadVideo(url, attach.VideoID, cfg.DownloadPath, cfg.VideoHeaders, cfg.UserAgent.UserAgent)
+				path := src.DownloadVideo(url, attach.VideoID, cfg.DownloadPath, cfg.VideoHeaders, cfg.UserAgent.UserAgent, maxProxy)
 				if path != "" {
 					videoPaths = append(videoPaths, path)
 				}
@@ -316,7 +318,7 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 			switch attach.Type {
 			case src.AttachmentTypePhoto:
 				if attach.BaseURL != "" && attach.PhotoToken != "" {
-					path := src.DownloadPhoto(attach.BaseURL, attach.PhotoToken, attach.PhotoID, cfg.DownloadPath, cfg.UserAgent.UserAgent)
+					path := src.DownloadPhoto(attach.BaseURL, attach.PhotoToken, attach.PhotoID, cfg.DownloadPath, cfg.UserAgent.UserAgent, maxProxy)
 					if path != "" {
 						imagePaths = append(imagePaths, path)
 					}
@@ -324,7 +326,7 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 			case src.AttachmentTypeVideo:
 				url, err := client.GetVideoLink(attach, message)
 				if err == nil {
-					path := src.DownloadVideo(url, attach.VideoID, cfg.DownloadPath, cfg.VideoHeaders, cfg.UserAgent.UserAgent)
+					path := src.DownloadVideo(url, attach.VideoID, cfg.DownloadPath, cfg.VideoHeaders, cfg.UserAgent.UserAgent, maxProxy)
 					if path != "" {
 						videoPaths = append(videoPaths, path)
 					}
@@ -332,14 +334,14 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 			case src.AttachmentTypeFile:
 				url, err := client.GetFileLink(attach, message)
 				if err == nil {
-					path := src.DownloadFile(url, attach.FileID, attach.FileName, cfg.DownloadPath, cfg.UserAgent.UserAgent)
+					path := src.DownloadFile(url, attach.FileID, attach.FileName, cfg.DownloadPath, cfg.UserAgent.UserAgent, maxProxy)
 					if path != "" {
 						filePaths = append(filePaths, path)
 					}
 				}
 			case src.AttachmentTypeAudio:
 				if attach.AudioURL != "" {
-					path := src.DownloadAudio(attach.AudioURL, attach.AudioID, cfg.DownloadPath, cfg.AudioHeaders, cfg.UserAgent.UserAgent)
+					path := src.DownloadAudio(attach.AudioURL, attach.AudioID, cfg.DownloadPath, cfg.AudioHeaders, cfg.UserAgent.UserAgent, maxProxy)
 					if path != "" {
 						audioPaths = append(audioPaths, path)
 					}
@@ -685,11 +687,6 @@ func main() {
 			telegramSender.SendDebugMessage("Reconnected!", cfg.TGDebugUserID)
 		}
 		for _, route := range cfg.ChatRoutes {
-			// if route.MaxChatID != 0 {
-			// 	if err := client.SubscribeToChat(route.MaxChatID); err != nil {
-			// 		src.Logf("Failed to subscribe to chat %d after reconnect: %v", route.MaxChatID, err)
-			// 	}
-			// }
 			SyncChatHistory(client, db, telegramSender, userNames, channelNames, cfg, route.MaxChatID)
 		}
 	})
@@ -722,13 +719,6 @@ func main() {
 				userNames[strconv.Itoa(userID)] = strconv.Itoa(userID)
 			}
 		}
-
-		// if route.MaxChatID != 0 {
-		// 	if err := client.SubscribeToChat(route.MaxChatID); err != nil {
-		// 		src.Logf("Failed to subscribe to chat %d: %v", route.MaxChatID, err)
-		// 		continue
-		// 	}
-		// }
 
 		SyncChatHistory(client, db, telegramSender, userNames, channelNames, cfg, route.MaxChatID)
 	}

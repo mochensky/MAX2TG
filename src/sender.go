@@ -19,11 +19,22 @@ type TelegramSender struct {
 	maxRetries     int
 	baseRetryDelay time.Duration
 	config         *Config
+	httpClient     *http.Client
 }
 
 func NewTelegramSender(botToken string, routes []ChatRoute, cfg *Config) *TelegramSender {
 	if cfg == nil {
 		cfg = DefaultConfig
+	}
+
+	tgProxy := GetTelegramProxy(cfg)
+	httpClient, err := BuildHTTPClientWithProxy(tgProxy, 30*time.Second)
+	if err != nil {
+		Logf("Warning: failed to configure Telegram proxy, using direct connection: %v", err)
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	}
+	if tgProxy != nil {
+		Logf("Telegram HTTP client configured with SOCKS5 proxy %s:%d", tgProxy.Host, tgProxy.Port)
 	}
 
 	return &TelegramSender{
@@ -32,6 +43,7 @@ func NewTelegramSender(botToken string, routes []ChatRoute, cfg *Config) *Telegr
 		maxRetries:     cfg.MaxRetries,
 		baseRetryDelay: cfg.BaseRetryDelay,
 		config:         cfg,
+		httpClient:     httpClient,
 	}
 }
 
@@ -112,7 +124,7 @@ func (s *TelegramSender) SendMessage(text string, maxChatID int, replyToMessageI
 			return 0, err
 		}
 
-		resp, err := http.Post(url, "application/json", bytes.NewReader(jsonData))
+		resp, err := s.httpClient.Post(url, "application/json", bytes.NewReader(jsonData))
 		if err != nil {
 			lastErr = err
 			continue
@@ -232,7 +244,7 @@ func (s *TelegramSender) SendMediaGroup(files []string, caption string, maxChatI
 
 		writer.Close()
 
-		resp, err := http.Post(url, writer.FormDataContentType(), &buf)
+		resp, err := s.httpClient.Post(url, writer.FormDataContentType(), &buf)
 		if err != nil {
 			lastErr = err
 			continue
@@ -341,7 +353,7 @@ func (s *TelegramSender) SendAudio(filePath string, caption string, maxChatID in
 		io.Copy(part, f)
 		writer.Close()
 
-		resp, err := http.Post(url, writer.FormDataContentType(), &buf)
+		resp, err := s.httpClient.Post(url, writer.FormDataContentType(), &buf)
 		if err != nil {
 			lastErr = err
 			continue
@@ -436,7 +448,7 @@ func (s *TelegramSender) EditMessageText(messageID int, text string, maxChatID i
 			return err
 		}
 
-		resp, err := http.Post(url, "application/json", bytes.NewReader(jsonData))
+		resp, err := s.httpClient.Post(url, "application/json", bytes.NewReader(jsonData))
 		if err != nil {
 			lastErr = err
 			continue
@@ -517,7 +529,7 @@ func (s *TelegramSender) EditMessageCaption(messageID int, caption string, maxCh
 			return err
 		}
 
-		resp, err := http.Post(url, "application/json", bytes.NewReader(jsonData))
+		resp, err := s.httpClient.Post(url, "application/json", bytes.NewReader(jsonData))
 		if err != nil {
 			lastErr = err
 			continue
@@ -588,7 +600,7 @@ func (s *TelegramSender) DeleteMessage(messageID int, maxChatID int) error {
 			return err
 		}
 
-		resp, err := http.Post(url, "application/json", bytes.NewReader(jsonData))
+		resp, err := s.httpClient.Post(url, "application/json", bytes.NewReader(jsonData))
 		if err != nil {
 			lastErr = err
 			continue
@@ -648,7 +660,7 @@ func (s *TelegramSender) SendDebugMessage(text string, userID int64) error {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewReader(jsonData))
+	resp, err := s.httpClient.Post(url, "application/json", bytes.NewReader(jsonData))
 	if err != nil {
 		return err
 	}

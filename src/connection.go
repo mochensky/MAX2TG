@@ -2,6 +2,7 @@ package src
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -94,6 +95,16 @@ func (c *Connection) Connect() error {
 
 	dialer := websocket.Dialer{
 		HandshakeTimeout: websocketHandshakeTimeout,
+	}
+
+	maxProxy := GetMaxProxy(c.config)
+	if maxProxy != nil {
+		socks5Dialer, err := BuildSOCKS5Dialer(maxProxy)
+		if err != nil {
+			return fmt.Errorf("failed to build SOCKS5 dialer for MAX: %w", err)
+		}
+		Logf("Connecting to WebSocket via SOCKS5 proxy %s:%d", maxProxy.Host, maxProxy.Port)
+		dialer.NetDial = socks5Dialer.Dial
 	}
 
 	conn, _, err := dialer.Dial(WEBSOCKET_URL, headers)

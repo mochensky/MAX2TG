@@ -124,6 +124,15 @@ type Chat struct {
 	Owner        *int        `json:"owner,omitempty"`
 }
 
+type ProxyConfig struct {
+	ForMax      bool   `yaml:"max"`
+	ForTelegram bool   `yaml:"telegram"`
+	Host        string `yaml:"host"`
+	Port        int    `yaml:"port"`
+	Username    string `yaml:"username"`
+	Password    string `yaml:"password"`
+}
+
 type UserAgentConfig struct {
 	UserAgent    string `yaml:"user_agent"`
 	Locale       string `yaml:"locale"`
@@ -164,6 +173,7 @@ type Config struct {
 	BaseRetryDelay time.Duration `yaml:"base_retry_delay"`
 	PingTimeout    time.Duration `yaml:"ping_timeout"`
 
+	Proxies      []ProxyConfig    `yaml:"proxy"`
 	UserAgent    *UserAgentConfig `yaml:"user_agent"`
 	VideoHeaders string           `yaml:"video_headers"`
 	AudioHeaders string           `yaml:"audio_headers"`

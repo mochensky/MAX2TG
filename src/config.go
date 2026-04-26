@@ -12,7 +12,7 @@ import (
 
 const (
 	AppName    = "max2tg"
-	AppVersion = "1.0.7"
+	AppVersion = "1.0.8"
 
 	DefaultEnvPath      = "data/.env"
 	DefaultDBPath       = "data/database.db"
@@ -233,45 +233,79 @@ func CreateDefaultConfig(path string) error {
 	yamlContent := fmt.Sprintf(`# %s %s
 # GitHub: https://github.com/mochensky/max2tg
 
-# data paths
+# EN: paths to data
+# RU: пути к данным
 env_path: "%s"
 db_path: "%s"
 log_path: "%s"
 download_path: "%s"
 
-# timezone for log timestamps (IANA format, e.g. Europe/Moscow, America/New_York, UTC)
+# EN: timezone for log timestamps (IANA format, e.g. Europe/Moscow, America/New_York, UTC)
+# RU: часовой пояс для времени в логах (формат IANA, например, Europe/Moscow, America/New_York, UTC)
 log_timezone: "%s"
 
-# how many recent chat messages will be checked for chat sync?
+# EN: how many recent chat messages will be checked for chat sync?
+# RU: сколько последних сообщений в чате будет проверено на синхронизацию?
 sync_history_depth: %d
 
-# will deleted messages from MAX be saved in Telegram with a special mark?
+# EN: will deleted messages from MAX be saved in Telegram with a special mark?
+# RU: будут ли удаленные сообщения из MAX сохранены в Telegram с особым маркером?
 save_deleted: %t
 
-# truncate long messages instead of skipping them (caption limit: 1024 chars, message limit: 4096 chars)
+# EN: truncate long messages instead of skipping them (caption limit: 1024 chars, message limit: 4096 chars)
+# RU: обрезать длинные сообщения вместо их пропуска (предел заголовка: 1024 символа, предел сообщения: 4096 символов)
 truncate_long_messages: %t
 
-# reconnect configuration
+# EN: configuration of retries for sending Telegram messages
+# RU: конфигурация повторных попыток отправлять Telegram сообщения
 max_retries: %d
 base_retry_delay: %s
+# EN: WebSocket ping timeout
+# RU: таймаут для ping WebSocket
 ping_timeout: %s
 
-# chat routing configuration
+# EN: chat routing configuration
+# RU: конфигурация маршрутизации чатов
 chats:
-  # e.g. 1: route MAX chat 0 to Telegram group / channel without topic
+  # EN: e.g. 1: route MAX chat 0 to Telegram group / channel without topic
+  # RU: например, 1: маршрутизировать чат MAX с id 0 в Telegram группу / канал без топика
   # - max_chat_id: 0
   #   telegram_chat_id: -1001234567890
   #   telegram_topic_id: 0
 
-  # e.g. 2: route MAX chat 123456789 to Telegram group -1001234567890 topic id 1
+  # EN: e.g. 2: route MAX chat 123456789 to Telegram group -1001234567890 topic id 1
+  # RU: например, 2: маршрутизировать чат MAX с id 123456789 в Telegram группу -1001234567890 в топик id 1
   # - max_chat_id: 123456789
   #   telegram_chat_id: -1001234567890
   #   telegram_topic_id: 1
 
-  # e.g. 3: route another MAX chat to different Telegram group / channel
+  # EN: e.g. 3: route another MAX chat to different Telegram group / channel
+  # RU: например, 3: маршрутизировать другой чат MAX в другую Telegram группу / канал
   # - max_chat_id: 987654321
   #   telegram_chat_id: -1009876543210
   #   telegram_topic_id: 0
+
+# EN: proxy configuration (optional, can be used to access Telegram if it's blocked in your region)
+# only SOCKS5 proxies are supported
+# username and password fields are optional and only needed if your proxy requires authentication
+# RU: конфигурация прокси (опционально, может быть использована для доступа к Telegram, если он заблокирован в вашем регионе)
+# поддерживаются только прокси SOCKS5
+# поля username и password являются необязательными и нужны только если ваш прокси требует аутентификацию
+proxy:
+  # EN: proxy for MAX
+  # RU: прокси для MAX
+  - max: false
+    host: "proxy.example.com"
+    port: 1080
+    username: "proxyuser"
+    password: "proxypass"
+  # EN: proxy for Telegram
+  # RU: прокси для Telegram
+  - telegram: false
+    host: "proxy.example.com"
+    port: 1080
+    username: "proxyuser"
+    password: "proxypass"
 
 user_agent:
   user_agent: "%s"
