@@ -148,8 +148,9 @@ type Config struct {
 	TGToken       string `yaml:"tg_token"`
 	TGDebugUserID int64  `yaml:"tg_debug_user_id"`
 
-	LogPath      string `yaml:"log_path"`
+	EnvPath      string `yaml:"env_path"`
 	DBPath       string `yaml:"db_path"`
+	LogPath      string `yaml:"log_path"`
 	DownloadPath string `yaml:"download_path"`
 
 	LogTimezone          string `yaml:"log_timezone"`

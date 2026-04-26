@@ -12,10 +12,11 @@ import (
 
 const (
 	AppName    = "max2tg"
-	AppVersion = "1.0.6"
+	AppVersion = "1.0.7"
 
-	DefaultLogPath      = "data/logs"
+	DefaultEnvPath      = "data/.env"
 	DefaultDBPath       = "data/database.db"
+	DefaultLogPath      = "data/logs"
 	DefaultDownloadPath = "data/downloads"
 
 	DefaultLogTimezone          = "Europe/Moscow"
@@ -73,8 +74,9 @@ var DefaultConfig = &Config{
 	Token:    "",
 	DeviceID: "",
 
-	LogPath:              DefaultLogPath,
+	EnvPath:              DefaultEnvPath,
 	DBPath:               DefaultDBPath,
+	LogPath:              DefaultLogPath,
 	DownloadPath:         DefaultDownloadPath,
 	LogTimezone:          DefaultLogTimezone,
 	SyncHistoryDepth:     DefaultSyncHistoryDepth,
@@ -124,11 +126,14 @@ func LoadConfig(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("error checking config file: %w", err)
 	}
 
-	envPath := "data/.env"
+	envPath := cfg.EnvPath
+	if envPath == "" {
+		envPath = DefaultEnvPath
+	}
 	if _, err := os.Stat(envPath); err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll("data", 0755); err != nil {
-				return nil, fmt.Errorf("failed to create data directory: %w", err)
+			if err := os.MkdirAll(filepath.Dir(envPath), 0755); err != nil {
+				return nil, fmt.Errorf("failed to create directory for .env file: %w", err)
 			}
 			envContent := `MAX_TOKEN=your_max_token_here
 MAX_DEVICE_ID=your_device_id_here
@@ -229,8 +234,9 @@ func CreateDefaultConfig(path string) error {
 # GitHub: https://github.com/mochensky/max2tg
 
 # data paths
-log_path: "%s"
+env_path: "%s"
 db_path: "%s"
+log_path: "%s"
 download_path: "%s"
 
 # timezone for log timestamps (IANA format, e.g. Europe/Moscow, America/New_York, UTC)
@@ -312,7 +318,7 @@ audio_headers: |
   Cache-Control: no-cache
 `,
 		AppName, AppVersion,
-		DefaultLogPath, DefaultDBPath, DefaultDownloadPath,
+		DefaultEnvPath, DefaultDBPath, DefaultLogPath, DefaultDownloadPath,
 		DefaultLogTimezone,
 		DefaultSyncHistoryDepth,
 		DefaultSaveDeleted,
