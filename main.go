@@ -13,7 +13,16 @@ import (
 	"github.com/mochensky/max2tg/src"
 )
 
-func BuildOutput(message src.Message, senderName string, userNames map[string]string, deletionTime *int64) string {
+func safeInt64(m map[string]interface{}, key string) int64 {
+	if v, ok := m[key]; ok {
+		if i, ok := v.(int64); ok {
+			return i
+		}
+	}
+	return 0
+}
+
+func BuildOutput(message src.Message, senderName string, userNames *src.SafeMap, deletionTime *int64) string {
 	timeStr := src.FormatTime(src.GetMessageTime(message))
 
 	text := ""
@@ -40,11 +49,7 @@ func BuildOutput(message src.Message, senderName string, userNames map[string]st
 			fwdSender = message.ForwardedMessage.Channel.Name
 		} else if message.ForwardedMessage.SenderID != nil {
 			uid := strconv.Itoa(*message.ForwardedMessage.SenderID)
-			if name, ok := userNames[uid]; ok {
-				fwdSender = name
-			} else {
-				fwdSender = uid
-			}
+			fwdSender = userNames.GetOrDefault(uid, uid)
 		}
 		if fwdSender == "" {
 			fwdSender = strconv.Itoa(message.ForwardedMessage.ID)
@@ -72,7 +77,7 @@ func BuildOutput(message src.Message, senderName string, userNames map[string]st
 	return output
 }
 
-func HandleControlMessage(message src.Message, userNames map[string]string) string {
+func HandleControlMessage(message src.Message, userNames *src.SafeMap) string {
 	if len(message.Attaches) == 0 {
 		return ""
 	}
@@ -97,10 +102,7 @@ func HandleControlMessage(message src.Message, userNames map[string]string) stri
 	timeStr := src.FormatTime(src.GetMessageTime(message))
 
 	getName := func(uid int) string {
-		if name, ok := userNames[strconv.Itoa(uid)]; ok {
-			return name
-		}
-		return strconv.Itoa(uid)
+		return userNames.GetOrDefault(strconv.Itoa(uid), strconv.Itoa(uid))
 	}
 
 	switch event {
@@ -164,49 +166,59 @@ func HandleControlMessage(message src.Message, userNames map[string]string) stri
 	return ""
 }
 
-func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames map[string]string, channelNames map[int]string, cfg *src.Config) {
+func resolveContact(client *src.Client, userNames *src.SafeMap, userID int) string {
+	key := strconv.Itoa(userID)
+	if name, ok := userNames.Get(key); ok {
+		return name
+	}
+	contacts, err := client.GetContacts([]int{userID})
+	if err == nil && len(contacts) > 0 {
+		contact := contacts[0]
+		name := strings.TrimSpace(contact.FirstName + " " + contact.LastName)
+		if name == "" {
+			name = key
+		}
+		userNames.Set(key, name)
+		return name
+	}
+	userNames.Set(key, key)
+	return key
+}
+
+func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames *src.SafeMap, channelNames *src.SafeIntMap, cfg *src.Config) {
+	defer func() {
+		if r := recover(); r != nil {
+			src.Logf("PANIC in ProcessMessage (msgID=%d, chatID=%d): %v", message.ID, message.ChatID, r)
+		}
+	}()
+
 	route := sender.FindRoute(message.ChatID)
 	if route == nil {
 		return
 	}
+
+	src.Logf("Processing message %d from chat %d (sender %d)", message.ID, message.ChatID, message.SenderID)
 
 	existing, _ := db.GetMessageByMaxID(int64(message.ID))
 	if existing != nil {
 		return
 	}
 
-	senderIDStr := strconv.Itoa(message.SenderID)
-	if _, ok := userNames[senderIDStr]; !ok {
-		contacts, err := client.GetContacts([]int{message.SenderID})
-		if err == nil && len(contacts) > 0 {
-			contact := contacts[0]
-			userNames[senderIDStr] = strings.TrimSpace(contact.FirstName + " " + contact.LastName)
-		} else {
-			userNames[senderIDStr] = senderIDStr
-		}
-	}
+	src.Logf("Resolving sender contact for message %d", message.ID)
+	resolveContact(client, userNames, message.SenderID)
 
 	if message.ForwardedMessage != nil && message.ForwardedMessage.SenderID != nil {
-		fwdSenderIDStr := strconv.Itoa(*message.ForwardedMessage.SenderID)
-		if _, ok := userNames[fwdSenderIDStr]; !ok {
-			contacts, err := client.GetContacts([]int{*message.ForwardedMessage.SenderID})
-			if err == nil && len(contacts) > 0 {
-				contact := contacts[0]
-				userNames[fwdSenderIDStr] = strings.TrimSpace(contact.FirstName + " " + contact.LastName)
-			} else {
-				userNames[fwdSenderIDStr] = fwdSenderIDStr
-			}
-		}
+		resolveContact(client, userNames, *message.ForwardedMessage.SenderID)
 	}
 
 	if message.ForwardedMessage != nil && message.ForwardedMessage.Channel != nil && message.ForwardedMessage.Channel.ID != 0 {
 		channelID := message.ForwardedMessage.Channel.ID
-		if _, ok := channelNames[channelID]; !ok {
+		if _, ok := channelNames.Get(channelID); !ok {
 			if message.ForwardedMessage.Channel.Name != "" {
-				channelNames[channelID] = message.ForwardedMessage.Channel.Name
+				channelNames.Set(channelID, message.ForwardedMessage.Channel.Name)
 			} else if channelID < 0 {
 				if chats, err := client.GetChatInfo([]int{channelID}); err == nil && len(chats) > 0 {
-					channelNames[channelID] = chats[0].Title
+					channelNames.Set(channelID, chats[0].Title)
 				}
 			}
 		}
@@ -233,25 +245,22 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 		for _, uid := range controlUserIDs {
 			uniqueUserIDs[uid] = struct{}{}
 		}
-
 		idsToFetch := make([]int, 0, len(uniqueUserIDs))
 		for uid := range uniqueUserIDs {
-			uidStr := strconv.Itoa(uid)
-			if _, ok := userNames[uidStr]; !ok {
+			if _, ok := userNames.Get(strconv.Itoa(uid)); !ok {
 				idsToFetch = append(idsToFetch, uid)
 			}
 		}
-
 		if len(idsToFetch) > 0 {
 			contacts, err := client.GetContacts(idsToFetch)
 			if err == nil {
 				for _, contact := range contacts {
-					uidStr := strconv.Itoa(contact.ID)
+					key := strconv.Itoa(contact.ID)
 					fullName := strings.TrimSpace(contact.FirstName + " " + contact.LastName)
 					if fullName == "" {
-						fullName = uidStr
+						fullName = key
 					}
-					userNames[uidStr] = fullName
+					userNames.Set(key, fullName)
 				}
 			} else {
 				src.Logf("Failed to fetch contacts for control message: %v", err)
@@ -350,8 +359,7 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 		}
 	}
 
-	senderName := userNames[senderIDStr]
-
+	senderName := userNames.GetOrDefault(strconv.Itoa(message.SenderID), strconv.Itoa(message.SenderID))
 	output := BuildOutput(message, senderName, userNames, nil)
 
 	var replyToMsgID *int
@@ -363,8 +371,10 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 					if rid != 0 {
 						existingReply, _ := db.GetMessageByMaxID(int64(rid))
 						if existingReply != nil {
-							tgID := int(existingReply["tg_message_id"].(int64))
-							replyToMsgID = &tgID
+							tgID := int(safeInt64(existingReply, "tg_message_id"))
+							if tgID != 0 {
+								replyToMsgID = &tgID
+							}
 						}
 					}
 				}
@@ -375,6 +385,8 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 	var tgMsgID int
 
 	hasMediaFiles := len(imagePaths) > 0 || len(videoPaths) > 0 || len(filePaths) > 0
+
+	src.Logf("Sending message %d to Telegram (hasMedia=%v, audioCount=%d)", message.ID, hasMediaFiles, len(audioPaths))
 
 	if !hasMediaFiles && len(audioPaths) == 0 {
 		var err error
@@ -428,7 +440,7 @@ func ProcessMessage(client *src.Client, db *src.Database, sender *src.TelegramSe
 	src.Logf("Message %d sent to Telegram with TG ID %d", message.ID, tgMsgID)
 }
 
-func HandleEditedMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames map[string]string, channelNames map[int]string, cfg *src.Config) {
+func HandleEditedMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames *src.SafeMap, channelNames *src.SafeIntMap, cfg *src.Config) {
 	route := sender.FindRoute(message.ChatID)
 	if route == nil {
 		return
@@ -440,34 +452,20 @@ func HandleEditedMessage(client *src.Client, db *src.Database, sender *src.Teleg
 		return
 	}
 
-	senderIDStr := strconv.Itoa(message.SenderID)
-	if _, ok := userNames[senderIDStr]; !ok {
-		contacts, err := client.GetContacts([]int{message.SenderID})
-		if err == nil && len(contacts) > 0 {
-			contact := contacts[0]
-			userNames[senderIDStr] = strings.TrimSpace(contact.FirstName + " " + contact.LastName)
-		} else {
-			userNames[senderIDStr] = senderIDStr
-		}
-	}
+	resolveContact(client, userNames, message.SenderID)
 
 	if message.ForwardedMessage != nil && message.ForwardedMessage.SenderID != nil {
-		fwdSenderIDStr := strconv.Itoa(*message.ForwardedMessage.SenderID)
-		if _, ok := userNames[fwdSenderIDStr]; !ok {
-			contacts, err := client.GetContacts([]int{*message.ForwardedMessage.SenderID})
-			if err == nil && len(contacts) > 0 {
-				contact := contacts[0]
-				userNames[fwdSenderIDStr] = strings.TrimSpace(contact.FirstName + " " + contact.LastName)
-			} else {
-				userNames[fwdSenderIDStr] = fwdSenderIDStr
-			}
-		}
+		resolveContact(client, userNames, *message.ForwardedMessage.SenderID)
 	}
 
-	name := userNames[senderIDStr]
-	output := BuildOutput(message, name, userNames, nil)
+	senderName := userNames.GetOrDefault(strconv.Itoa(message.SenderID), strconv.Itoa(message.SenderID))
+	output := BuildOutput(message, senderName, userNames, nil)
 
-	tgMsgID := int(existing["tg_message_id"].(int64))
+	tgMsgID := int(safeInt64(existing, "tg_message_id"))
+	if tgMsgID == 0 {
+		src.Logf("Edited message %d has no valid tg_message_id in database, skipping", message.ID)
+		return
+	}
 
 	hasAttachments := len(message.Attaches) > 0
 	if message.ForwardedMessage != nil {
@@ -493,7 +491,7 @@ func HandleEditedMessage(client *src.Client, db *src.Database, sender *src.Teleg
 	}
 }
 
-func HandleDeletedMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames map[string]string, channelNames map[int]string, cfg *src.Config) {
+func HandleDeletedMessage(client *src.Client, db *src.Database, sender *src.TelegramSender, message src.Message, userNames *src.SafeMap, channelNames *src.SafeIntMap, cfg *src.Config) {
 	route := sender.FindRoute(message.ChatID)
 	if route == nil {
 		return
@@ -505,7 +503,11 @@ func HandleDeletedMessage(client *src.Client, db *src.Database, sender *src.Tele
 		return
 	}
 
-	tgMsgID := int(existing["tg_message_id"].(int64))
+	tgMsgID := int(safeInt64(existing, "tg_message_id"))
+	if tgMsgID == 0 {
+		src.Logf("Deleted message %d has no valid tg_message_id in database, skipping", message.ID)
+		return
+	}
 
 	if !cfg.SaveDeleted {
 		err = sender.DeleteMessage(tgMsgID, message.ChatID)
@@ -515,63 +517,45 @@ func HandleDeletedMessage(client *src.Client, db *src.Database, sender *src.Tele
 			db.DeleteMessageByMaxID(int64(message.ID))
 			src.Logf("Message %d deleted from Telegram and database", message.ID)
 		}
+		return
+	}
+
+	resolveContact(client, userNames, message.SenderID)
+
+	if message.ForwardedMessage != nil && message.ForwardedMessage.SenderID != nil {
+		resolveContact(client, userNames, *message.ForwardedMessage.SenderID)
+	}
+
+	senderName := userNames.GetOrDefault(strconv.Itoa(message.SenderID), strconv.Itoa(message.SenderID))
+
+	var deletionTimestamp int64
+	if message.UpdateTime != nil {
+		deletionTimestamp = *message.UpdateTime
 	} else {
-		senderIDStr := strconv.Itoa(message.SenderID)
-		if _, ok := userNames[senderIDStr]; !ok {
-			contacts, err := client.GetContacts([]int{message.SenderID})
-			if err == nil && len(contacts) > 0 {
-				contact := contacts[0]
-				userNames[senderIDStr] = strings.TrimSpace(contact.FirstName + " " + contact.LastName)
-			} else {
-				userNames[senderIDStr] = senderIDStr
-			}
-		}
+		deletionTimestamp = time.Now().Unix()
+	}
 
-		if message.ForwardedMessage != nil && message.ForwardedMessage.SenderID != nil {
-			fwdSenderIDStr := strconv.Itoa(*message.ForwardedMessage.SenderID)
-			if _, ok := userNames[fwdSenderIDStr]; !ok {
-				contacts, err := client.GetContacts([]int{*message.ForwardedMessage.SenderID})
-				if err == nil && len(contacts) > 0 {
-					contact := contacts[0]
-					userNames[fwdSenderIDStr] = strings.TrimSpace(contact.FirstName + " " + contact.LastName)
-				} else {
-					userNames[fwdSenderIDStr] = fwdSenderIDStr
-				}
-			}
-		}
+	output := BuildOutput(message, senderName, userNames, &deletionTimestamp)
 
-		senderName := userNames[senderIDStr]
+	hasAttachments := len(message.Attaches) > 0
+	if message.ForwardedMessage != nil {
+		hasAttachments = hasAttachments || len(message.ForwardedMessage.Attaches) > 0
+	}
 
-		var deletionTimestamp int64
-		if message.UpdateTime != nil {
-			deletionTimestamp = *message.UpdateTime
-		} else {
-			deletionTimestamp = time.Now().Unix()
-		}
+	if hasAttachments {
+		err = sender.EditMessageCaption(tgMsgID, output, message.ChatID)
+	} else {
+		err = sender.EditMessageText(tgMsgID, output, message.ChatID)
+	}
 
-		output := BuildOutput(message, senderName, userNames, &deletionTimestamp)
-
-		hasAttachments := len(message.Attaches) > 0
-		if message.ForwardedMessage != nil {
-			hasAttachments = hasAttachments || len(message.ForwardedMessage.Attaches) > 0
-		}
-
-		err = nil
-		if hasAttachments {
-			err = sender.EditMessageCaption(tgMsgID, output, message.ChatID)
-		} else {
-			err = sender.EditMessageText(tgMsgID, output, message.ChatID)
-		}
-
-		if err != nil {
-			src.Logf("Failed to edit deleted message %d in Telegram: %v", message.ID, err)
-		} else {
-			src.Logf("Message %d marked as deleted (edited with marker)", message.ID)
-		}
+	if err != nil {
+		src.Logf("Failed to edit deleted message %d in Telegram: %v", message.ID, err)
+	} else {
+		src.Logf("Message %d marked as deleted (edited with marker)", message.ID)
 	}
 }
 
-func SyncChatHistory(client *src.Client, db *src.Database, sender *src.TelegramSender, userNames map[string]string, channelNames map[int]string, cfg *src.Config, chatID int) {
+func SyncChatHistory(client *src.Client, db *src.Database, sender *src.TelegramSender, userNames *src.SafeMap, channelNames *src.SafeIntMap, cfg *src.Config, chatID int) {
 	src.Logf("Starting chat history synchronization for chat %d...", chatID)
 
 	messages, err := client.GetMessages(chatID, cfg.SyncHistoryDepth, 0, nil)
@@ -595,7 +579,7 @@ func SyncChatHistory(client *src.Client, db *src.Database, sender *src.TelegramS
 				if msg.UpdateTime != nil {
 					updateTime = *msg.UpdateTime
 				}
-				storedEditTime := existing["edited_at"].(int64)
+				storedEditTime := safeInt64(existing, "edited_at")
 				if updateTime > storedEditTime {
 					src.Logf("Message %d was edited, updating in Telegram", msg.ID)
 					HandleEditedMessage(client, db, sender, msg, userNames, channelNames, cfg)
@@ -657,8 +641,8 @@ func main() {
 
 	telegramSender := src.NewTelegramSender(cfg.TGToken, cfg.ChatRoutes, cfg)
 
-	userNames := make(map[string]string)
-	channelNames := make(map[int]string)
+	userNames := src.NewSafeMap()
+	channelNames := src.NewSafeIntMap()
 
 	client := src.NewClient(cfg)
 
@@ -711,13 +695,7 @@ func main() {
 		}
 
 		for userID := range targetChat.Participants {
-			contacts, err := client.GetContacts([]int{userID})
-			if err == nil && len(contacts) > 0 {
-				contact := contacts[0]
-				userNames[strconv.Itoa(userID)] = strings.TrimSpace(contact.FirstName + " " + contact.LastName)
-			} else {
-				userNames[strconv.Itoa(userID)] = strconv.Itoa(userID)
-			}
+			resolveContact(client, userNames, userID)
 		}
 
 		SyncChatHistory(client, db, telegramSender, userNames, channelNames, cfg, route.MaxChatID)

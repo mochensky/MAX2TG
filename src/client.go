@@ -1,6 +1,7 @@
 package src
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -174,12 +175,14 @@ func (c *Client) Connect() error {
 		return err
 	}
 
-	profile := parseProfile(response["payload"].(map[string]interface{}))
+	rawPayload, ok := response["payload"].(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("authentication response missing payload")
+	}
+	profile := parseProfile(rawPayload)
 	c.me = &profile
-	if payload, ok := response["payload"].(map[string]interface{}); ok {
-		if chatsData, ok := payload["chats"].([]interface{}); ok {
-			c.chats = parseChats(castToMapArray(chatsData))
-		}
+	if chatsData, ok := rawPayload["chats"].([]interface{}); ok {
+		c.chats = parseChats(castToMapArray(chatsData))
 	}
 	c.connectionTime = time.Now()
 
@@ -214,36 +217,42 @@ func (c *Client) Start() error {
 }
 
 func (c *Client) runEventLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			Logf("PANIC in runEventLoop: %v", r)
+		}
+	}()
 	wasConnected := true
 	for c.running && !c.stopping {
-		select {
-		case <-time.After(10 * time.Millisecond):
-		default:
-			if !c.connection.IsConnected() {
-				if !c.connection.IsReconnecting() && wasConnected {
-					wasConnected = false
-					go c.connection.HandleReconnect("Connection lost")
-				}
-				time.Sleep(1 * time.Second)
-				continue
+		if !c.connection.IsConnected() {
+			if !c.connection.IsReconnecting() && wasConnected {
+				wasConnected = false
+				go c.connection.HandleReconnect("Connection lost")
 			}
+			time.Sleep(1 * time.Second)
+			continue
+		}
 
-			wasConnected = true
+		wasConnected = true
 
-			payload, err := c.connection.Receive()
-			if err != nil {
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
+		payload, err := c.connection.Receive()
+		if err != nil {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
 
-			if opcode, ok := parseInt(payload["opcode"]); ok && opcode == int(ON_MESSAGE) {
-				c.handleMessage(payload)
-			}
+		if opcode, ok := parseInt(payload["opcode"]); ok && opcode == int(ON_MESSAGE) {
+			go c.handleMessage(payload)
 		}
 	}
 }
 
 func (c *Client) handleMessage(messageData map[string]interface{}) {
+	defer func() {
+		if r := recover(); r != nil {
+			Logf("PANIC in handleMessage: %v", r)
+		}
+	}()
 	payload, ok := messageData["payload"].(map[string]interface{})
 	if !ok {
 		return

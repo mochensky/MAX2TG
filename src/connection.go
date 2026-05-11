@@ -214,6 +214,11 @@ func (c *Connection) startPing(stopCh <-chan struct{}) {
 
 	go func() {
 		defer ticker.Stop()
+		defer func() {
+			if r := recover(); r != nil {
+				Logf("PANIC in ping goroutine: %v", r)
+			}
+		}()
 		for {
 			select {
 			case <-stopCh:
@@ -249,6 +254,15 @@ func (c *Connection) startPing(stopCh <-chan struct{}) {
 
 func (c *Connection) receiveMessages(stopCh <-chan struct{}) {
 	defer c.closeStopCh()
+	defer func() {
+		if r := recover(); r != nil {
+			Logf("PANIC in receiveMessages: %v", r)
+			if c.connected {
+				c.connected = false
+				go c.HandleReconnect(fmt.Sprintf("panic in receiveMessages: %v", r))
+			}
+		}
+	}()
 
 	for {
 		_, message, err := c.conn.ReadMessage()
@@ -337,7 +351,14 @@ func (c *Connection) sendAndReceive(payload WebSocketPayload, timeout time.Durat
 		return nil, NewConnectionError("WebSocket not connected")
 	}
 
-	seq := payload["seq"].(int)
+	seqRaw, ok := payload["seq"]
+	if !ok {
+		return nil, NewConnectionError("payload missing seq field")
+	}
+	seq, ok := seqRaw.(int)
+	if !ok {
+		return nil, NewConnectionError(fmt.Sprintf("payload seq has unexpected type %T", seqRaw))
+	}
 	responseChan := make(chan WebSocketPayload, 1)
 
 	c.mu.Lock()
