@@ -709,6 +709,9 @@ func FormatTime(timestamp int64) string {
 		return ""
 	}
 	tm := time.Unix(timestamp/1000, 0)
-	loc, _ := time.LoadLocation("Europe/Moscow")
+	loc, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		loc = time.UTC
+	}
 	return tm.In(loc).Format("02.01.2006 15:04:05")
 }
